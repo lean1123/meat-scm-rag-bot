@@ -16,25 +16,61 @@ except (ConnectionFailure, AttributeError) as e:
 
 if client:
     db = client["farm_db"]
-    batches_collection = db["batches"]
+    assets_collection = db["assets"]
 else:
     db = None
-    batches_collection = None
+    assets_collection = None
 
-def get_batch_info_by_id(batch_id: str, farm_id: str) -> dict | None:
-    if not batches_collection:
-        print("ERROR: batches_collection is not available.")
+def get_asset_info_by_id(asset_id: str, facility_id: str) -> dict | None:
+    """
+    Lấy thông tin đàn vật nuôi theo assetID và facilityID
+    """
+    if not assets_collection:
+        print("ERROR: assets_collection is not available.")
         return None
 
     try:
-        query = {"batch_id": batch_id, "facilityID": farm_id}
-        batch_data = batches_collection.find_one(query)
+        query = {"assetID": asset_id, "history.details.facilityID": facility_id}
+        asset_data = assets_collection.find_one(query)
 
-        if batch_data:
-            batch_data["_id"] = str(batch_data["_id"])
+        if asset_data:
+            # Chuyển đổi _id thành string và tạo dict mới
+            result = dict(asset_data)
+            result["_id"] = str(result["_id"])
+            return result
 
-        return batch_data
+        return None
 
     except Exception as e:
         print(f"An error occurred while querying MongoDB: {e}")
         return None
+
+def get_current_feeds(asset_id: str, facility_id: str) -> list | None:
+    """
+    Lấy thông tin thức ăn hiện tại của đàn vật nuôi
+    """
+    asset_data = get_asset_info_by_id(asset_id, facility_id)
+    if not asset_data or not asset_data.get("history"):
+        return None
+
+    # Lấy thông tin feeds từ history item gần nhất
+    latest_history = asset_data["history"][-1] if asset_data["history"] else None
+    if latest_history and latest_history.get("details", {}).get("feeds"):
+        return latest_history["details"]["feeds"]
+
+    return None
+
+def get_current_medications(asset_id: str, facility_id: str) -> list | None:
+    """
+    Lấy thông tin thuốc/vaccine hiện tại của đàn vật nuôi
+    """
+    asset_data = get_asset_info_by_id(asset_id, facility_id)
+    if not asset_data or not asset_data.get("history"):
+        return None
+
+    # Lấy thông tin medications từ history item gần nhất
+    latest_history = asset_data["history"][-1] if asset_data["history"] else None
+    if latest_history and latest_history.get("details", {}).get("medications"):
+        return latest_history["details"]["medications"]
+
+    return None
