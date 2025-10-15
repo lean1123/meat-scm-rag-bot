@@ -49,7 +49,7 @@ def search_knowledge_base(query: str, farm_id: str) -> dict | None:
     try:
         knowledge_collection = client.collections.get("FarmingKnowledge")
 
-        global_filter = Filter.by_property("farm_id").equal("global")
+        global_filter = Filter.by_property("facilityID").equal("global")
 
         result_global = knowledge_collection.query.near_text(
             query=query,

@@ -3,19 +3,21 @@ from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
-from app.services.user_service import get_user_by_username
+from app.services.user_service import get_user_by_email
 import os
 
-SECRET_KEY = os.getenv("SECRET_KEY", "a_very_secret_key_for_dev")
+SECRET_KEY = os.getenv("SECRET_KEY")
+# log secret key for debugging (in production, avoid logging sensitive info)
+print(f"Using SECRET_KEY: {SECRET_KEY[:4]}...")  # Print only the first 4 characters for security
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 24
 
 security = HTTPBearer()
 
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -44,17 +46,23 @@ async def get_current_user(credentials=Depends(security)):
     )
     try:
         token = credentials.credentials
+        # log token for debugging
+        print(f"Received token: {token}")
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
+        # log payload for debugging
+        print(f"Decoded JWT payload: {payload}")
+        email: str = payload.get("email")
         farm_id: str = payload.get("facilityID")
-        if username is None or farm_id is None:
+        if email is None or farm_id is None:
             raise credentials_exception
-        token_data = TokenData(username=username)
+        token_data = TokenData(username=email)
     except JWTError:
         raise credentials_exception
 
     # Kiểm tra user có tồn tại trong database không
-    user_data = get_user_by_username(token_data.username, farm_id)
+    user_data = get_user_by_email(email=token_data.username, farm_id=farm_id)
+    # log user_data for debugging
+    print(f"User data fetched from DB: {user_data}")
     if user_data is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -63,7 +71,7 @@ async def get_current_user(credentials=Depends(security)):
         )
 
     # Kiểm tra user có đang active không
-    if not user_data.get("is_active", True):
+    if not user_data.get("status") == "active":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled",

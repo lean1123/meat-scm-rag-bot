@@ -12,7 +12,7 @@ knowledge_data = [
         "feed_dosage": "0.8 kg/con/ngày",
         "medication": "Tiêm vắc-xin E.coli",
         "notes": "Theo dõi tiêu hóa 2 ngày đầu sau tập ăn, đảm bảo cung cấp đủ nước sạch.",
-        "facilityID": "FarmA"
+        "facilityID": "farm-a"
     },
     {
         "stage": "Tăng trọng",
@@ -22,7 +22,7 @@ knowledge_data = [
         "feed_dosage": "2.5 kg/con/ngày",
         "medication": "Tẩy giun định kỳ",
         "notes": "Đảm bảo chuồng trại thoáng mát, mật độ nuôi phù hợp.",
-        "facilityID": "FarmA"
+        "facilityID": "farm-a"
     },
     {
         "stage": "Vỗ béo",
@@ -32,7 +32,7 @@ knowledge_data = [
         "feed_dosage": "3.5 kg/con/ngày",
         "medication": "Tiêm nhắc lại vắc-xin dịch tả",
         "notes": "Tăng cường rau xanh để cải thiện chất lượng thịt.",
-        "facilityID": "FarmA"
+        "facilityID": "farm-a"
     },
     {
         "stage": "Úm gà",
@@ -42,7 +42,7 @@ knowledge_data = [
         "feed_dosage": "20-50 g/con/ngày",
         "medication": "Vắc-xin Newcastle (lần 1), Gumboro",
         "notes": "Luôn giữ nhiệt độ chuồng úm ở 30-32°C, che chắn gió lùa.",
-        "facilityID": "FarmB"
+        "facilityID": "farm-b"
     }
 ]
 

@@ -87,3 +87,37 @@ def get_user_by_username(username: str, farm_id: str) -> Optional[Dict[str, Any]
     except Exception as e:
         print(f"Error in get_user_by_username: {e}")
         return None
+
+def get_user_by_email(email: str, farm_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Lấy thông tin user từ database theo email và farm_id
+    """
+    if db is None:
+        print("ERROR: database connection is not available.")
+        return None
+
+    try:
+        collection = db["users"]
+
+        user = collection.find_one({
+            "email": email,
+            "facilityID": farm_id
+        })
+
+        if user:
+            return {
+                "id": str(user["_id"]),
+                "email": user.get("email"),
+                "name": user.get("name"),
+                "role": user.get("role"),
+                "facilityID": user.get("facilityID"),
+                "status": user.get("status"),
+                "fabricEnrollmentID": user.get("fabricEnrollmentID"),
+                "is_active": user.get("status") == "active"
+            }
+
+        return None
+
+    except Exception as e:
+        print(f"Error in get_user_by_email: {e}")
+        return None
