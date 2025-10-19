@@ -1,5 +1,5 @@
-from app.services.mongo_service import get_asset_info_by_id, get_current_feeds, get_current_medications
-from app.services.weaviate_service import search_knowledge_base
+from app.services.asset_service import get_asset_info_by_id, get_current_feeds, get_current_medications
+from app.services.farm_weaviate_service import search_knowledge_base
 from app import auth
 from app.auth import User
 from app.services.gemini_service import detect_intent
@@ -85,7 +85,7 @@ async def handle_chat(request: ChatRequest, current_user: User = Depends(auth.ge
         elif intent == "suggest_feed":
             knowledge = search_knowledge_base(request.question, user_facility_id)
             if knowledge:
-                answer = (f"Với vật nuôi giai đoạn '{knowledge['stage']}' ({knowledge['age_range']}), "
+                answer = (f"Với vật nuôi giai đoạn '{knowledge['stage']}' từ ({knowledge['min_age_days']} - {knowledge['max_age_days']}), "
                           f"bạn nên dùng '{knowledge['recommended_feed']}' "
                           f"với liều lượng {knowledge['feed_dosage']}. "
                           f"Lưu ý: {knowledge['notes']}")

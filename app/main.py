@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.routes import chat
+from app.configurations import weaviate_config
 
 app = FastAPI(
     title="Farm AI Chatbot API",

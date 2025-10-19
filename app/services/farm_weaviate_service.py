@@ -1,27 +1,16 @@
-import os
-import weaviate
 from weaviate.classes.query import Filter
-from dotenv import load_dotenv
+from app.configurations.weaviate_config import client
 
-load_dotenv()
-WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "localhost")
-WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", "8080"))
 
-client = None
-try:
-    client = weaviate.connect_to_local(
-        host=WEAVIATE_HOST,
-        port=WEAVIATE_PORT
-    )
-    if client.is_live():
-        print("Weaviate connection successful.")
-    else:
-        print("Weaviate connection failed: Server is not live.")
-        client = None
+# check weaviate client connection
+if client is None:
+    print("Weaviate client is not connected. Please check the configuration.")
 
-except Exception as e:
-    print(f"Could not connect to Weaviate: {e}")
-    client = None
+
+def extract_age_days(query: str) -> int | None:
+    import re
+    match = re.search(r"(\d+)\s*ngày", query)
+    return int(match.group(1)) if match else None
 
 def search_knowledge_base(query: str, farm_id: str) -> dict | None:
     if not client:
@@ -30,12 +19,17 @@ def search_knowledge_base(query: str, farm_id: str) -> dict | None:
 
     try:
         knowledge_collection = client.collections.get("FarmingKnowledge")
+        age_days = extract_age_days(query)
 
-        farm_filter = Filter.by_property("facilityID").equal(farm_id)
+        filters  = Filter.by_property("facilityID").equal(farm_id)
+
+        if age_days is not None:
+            filters = filters & Filter.by_property("min_age_days").less_or_equal(age_days)
+            filters = filters & Filter.by_property("max_age_days").greater_or_equal(age_days)
 
         result_farm = knowledge_collection.query.near_text(
             query=query,
-            filters=farm_filter,
+            filters=filters,
             limit=1
         )
 

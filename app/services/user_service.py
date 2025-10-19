@@ -1,123 +1,45 @@
-import os
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
-from dotenv import load_dotenv
 from typing import Optional, Dict, Any
+from app.configurations.mongo_config import db
 
-load_dotenv()
-MONGO_URI = os.getenv("MONGO_URI")
+collection_name = "users"
 
-try:
-    client = MongoClient(MONGO_URI)
-    client.admin.command('ping')
-    print("MongoDB connection successful.")
-except (ConnectionFailure, AttributeError) as e:
-    print(f"Could not connect to MongoDB: {e}")
-    client = None
+def _format_user(user: dict) -> Dict[str, Any]:
+    return {
+        "id": str(user["_id"]),
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "role": user.get("role"),
+        "facilityID": user.get("facilityID"),
+        "status": user.get("status"),
+        "fabricEnrollmentID": user.get("fabricEnrollmentID"),
+        "is_active": user.get("status") == "active",
+    }
 
-if client:
-    db = client["farm_db"]
-else:
-    db = None
+def _find_user(filter: dict) -> Optional[Dict[str, Any]]:
+    if not db:
+        print("ERROR: Database connection is not available.")
+        return None
+
+    try:
+        collection = db[collection_name]
+        user = collection.find_one(filter)
+
+        if user:
+            return _format_user(user)
+
+        return None
+
+    except Exception as e:
+        print(f"Error in _find_user: {e}")
+        return None
 
 def get_user_by_id(user_id: str, farm_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Lấy thông tin user từ database theo user_id và farm_id
-    """
-    if not db:
-        print("ERROR: database connection is not available.")
-        return None
+    return _find_user({"_id": user_id, "facilityID": farm_id})
 
-    try:
-        collection = db["users"]
-
-        user = collection.find_one({
-            "_id": user_id,
-            "facilityID": farm_id
-        })
-
-        if user:
-            return {
-                "id": str(user["_id"]),
-                "email": user.get("email"),
-                "name": user.get("name"),
-                "role": user.get("role"),
-                "facilityID": user.get("facilityID"),
-                "status": user.get("status"),
-                "fabricEnrollmentID": user.get("fabricEnrollmentID"),
-                "is_active": user.get("status") == "active"
-            }
-
-        return None
-
-    except Exception as e:
-        print(f"Error in get_user_by_id: {e}")
-        return None
 
 def get_user_by_username(username: str, farm_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Lấy thông tin user từ database theo username và farm_id
-    """
-    if not db:
-        print("ERROR: database connection is not available.")
-        return None
+    return _find_user({"email": username, "facilityID": farm_id})
 
-    try:
-        collection = db["users"]
-
-        user = collection.find_one({
-            "email": username,
-            "facilityID": farm_id
-        })
-
-        if user:
-            return {
-                "id": str(user["_id"]),
-                "email": user.get("email"),
-                "name": user.get("name"),
-                "role": user.get("role"),
-                "facilityID": user.get("facilityID"),
-                "status": user.get("status"),
-                "fabricEnrollmentID": user.get("fabricEnrollmentID"),
-                "is_active": user.get("status") == "active"
-            }
-
-        return None
-
-    except Exception as e:
-        print(f"Error in get_user_by_username: {e}")
-        return None
 
 def get_user_by_email(email: str, farm_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Lấy thông tin user từ database theo email và farm_id
-    """
-    if db is None:
-        print("ERROR: database connection is not available.")
-        return None
-
-    try:
-        collection = db["users"]
-
-        user = collection.find_one({
-            "email": email,
-            "facilityID": farm_id
-        })
-
-        if user:
-            return {
-                "id": str(user["_id"]),
-                "email": user.get("email"),
-                "name": user.get("name"),
-                "role": user.get("role"),
-                "facilityID": user.get("facilityID"),
-                "status": user.get("status"),
-                "fabricEnrollmentID": user.get("fabricEnrollmentID"),
-                "is_active": user.get("status") == "active"
-            }
-
-        return None
-
-    except Exception as e:
-        print(f"Error in get_user_by_email: {e}")
-        return None
+    return _find_user({"email": email, "facilityID": farm_id})
