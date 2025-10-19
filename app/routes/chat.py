@@ -1,10 +1,11 @@
-from app.services.asset_service import get_current_feeds, get_current_medications
-from app.services.farm_weaviate_service import search_knowledge_base
-from app.services.auth_service import get_current_user
-from app.services.auth_service import User
-from app.services.gemini_service import detect_intent
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+
+from app.services.asset_service import get_asset_service, AssetService
+from app.services.auth_service import User
+from app.services.auth_service import get_current_user
+from app.services.farm_weaviate_service import search_knowledge_base
+from app.services.gemini_service import detect_intent
 
 
 class ChatRequest(BaseModel):
@@ -19,7 +20,8 @@ router = APIRouter()
 
 
 @router.post("/chat", response_model=ChatResponse, tags=["Chat"])
-async def handle_chat(request: ChatRequest, current_user: User = Depends(get_current_user)):
+async def handle_chat(request: ChatRequest, current_user: User = Depends(get_current_user),
+                      asset_service: AssetService = Depends(get_asset_service)):
     try:
         user_facility_id = current_user.facilityID
         question = request.question.lower()
@@ -41,14 +43,14 @@ async def handle_chat(request: ChatRequest, current_user: User = Depends(get_cur
             if not asset_id:
                 answer = "Bạn muốn hỏi về đàn nào ạ? Vui lòng cung cấp mã đàn (ví dụ: ASSET_HEO_001)."
             else:
-                feeds = get_current_feeds(asset_id, user_facility_id)
+                feeds = asset_service.get_current_feeds(asset_id, user_facility_id)
                 if feeds:
                     current_feed = feeds[0] if feeds else None
                     if current_feed:
                         answer = (f"Đàn {asset_id} hiện đang sử dụng '{current_feed.get('name')}' "
-                                f"với liều lượng {current_feed.get('dosageKg')} kg/con/ngày "
-                                f"từ ngày {current_feed.get('startDate')} đến {current_feed.get('endDate')}. "
-                                f"Ghi chú: {current_feed.get('notes', 'Không có ghi chú đặc biệt')}.")
+                                  f"với liều lượng {current_feed.get('dosageKg')} kg/con/ngày "
+                                  f"từ ngày {current_feed.get('startDate')} đến {current_feed.get('endDate')}. "
+                                  f"Ghi chú: {current_feed.get('notes', 'Không có ghi chú đặc biệt')}.")
                     else:
                         answer = f"Không tìm thấy thông tin thức ăn cho đàn {asset_id}."
                 else:
@@ -59,7 +61,7 @@ async def handle_chat(request: ChatRequest, current_user: User = Depends(get_cur
             if not asset_id:
                 answer = "Bạn muốn hỏi về lịch tiêm của đàn nào ạ? Vui lòng cung cấp mã đàn."
             else:
-                medications = get_current_medications(asset_id, user_facility_id)
+                medications = asset_service.get_current_medications(asset_id, user_facility_id)
                 if medications:
                     # Tìm vaccine có nextDueDate gần nhất
                     next_medication = None
@@ -70,14 +72,14 @@ async def handle_chat(request: ChatRequest, current_user: User = Depends(get_cur
 
                     if next_medication:
                         answer = (f"Theo lịch, đàn {asset_id} cần tiêm nhắc lại "
-                                f"'{next_medication.get('name')}' vào ngày {next_medication.get('nextDueDate')} "
-                                f"với liều lượng {next_medication.get('dose')}.")
+                                  f"'{next_medication.get('name')}' vào ngày {next_medication.get('nextDueDate')} "
+                                  f"với liều lượng {next_medication.get('dose')}.")
                     else:
                         # Hiển thị thông tin vaccine đã tiêm gần nhất
                         latest_med = medications[-1] if medications else None
                         if latest_med:
                             answer = (f"Đàn {asset_id} đã được tiêm '{latest_med.get('name')}' "
-                                    f"vào ngày {latest_med.get('dateApplied')} với liều lượng {latest_med.get('dose')}.")
+                                      f"vào ngày {latest_med.get('dateApplied')} với liều lượng {latest_med.get('dose')}.")
                         else:
                             answer = f"Không tìm thấy thông tin về thuốc/vaccine cho đàn {asset_id}."
                 else:
@@ -85,10 +87,11 @@ async def handle_chat(request: ChatRequest, current_user: User = Depends(get_cur
         elif intent == "suggest_feed":
             knowledge = search_knowledge_base(request.question, user_facility_id)
             if knowledge:
-                answer = (f"Với vật nuôi giai đoạn '{knowledge['stage']}' từ ({knowledge['min_age_days']} - {knowledge['max_age_days']}), "
-                          f"bạn nên dùng '{knowledge['recommended_feed']}' "
-                          f"với liều lượng {knowledge['feed_dosage']}. "
-                          f"Lưu ý: {knowledge['notes']}")
+                answer = (
+                    f"Với vật nuôi giai đoạn '{knowledge['stage']}' từ ({knowledge['min_age_days']} - {knowledge['max_age_days']}), "
+                    f"bạn nên dùng '{knowledge['recommended_feed']}' "
+                    f"với liều lượng {knowledge['feed_dosage']}. "
+                    f"Lưu ý: {knowledge['notes']}")
             else:
                 answer = "Xin lỗi, tôi chưa tìm thấy hướng dẫn dinh dưỡng phù hợp trong cơ sở tri thức."
 

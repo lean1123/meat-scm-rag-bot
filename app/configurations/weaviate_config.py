@@ -1,4 +1,6 @@
+import atexit
 import os
+
 import weaviate
 from dotenv import load_dotenv
 
@@ -23,5 +25,9 @@ except Exception as e:
     print(f"Could not connect to Weaviate: {e}")
     client = None
 
+
 def get_weaviate_client():
     return client
+
+
+atexit.register(client.close)

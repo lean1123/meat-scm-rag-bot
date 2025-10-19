@@ -1,10 +1,14 @@
+import os
+from datetime import datetime, timedelta, timezone
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from jose import JWTError, jwt
-from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
-from app.services.user_service import get_user_by_email
-import os
+
+from app.services.user_service import get_user_service, UserService
+
+# NOTE: when used as dependency, FastAPI will inject UserService via Depends(get_user_service)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -36,7 +40,7 @@ class TokenData(BaseModel):
     username: str | None = None
 
 
-async def get_current_user(credentials=Depends(security)):
+async def get_current_user(credentials=Depends(security), user_service: UserService = Depends(get_user_service)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -55,21 +59,16 @@ async def get_current_user(credentials=Depends(security)):
     except JWTError:
         raise credentials_exception
 
-    user_data = get_user_by_email(email=token_data.username, farm_id=farm_id)
-
+    # Tìm user trong DB bằng UserService
+    user_data = user_service.get_user_by_email(email=token_data.username, farm_id=farm_id)
     if user_data is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found in database",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise credentials_exception
 
-    if not user_data.get("status") == "active":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is disabled",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    # Trả về Pydantic User
+    try:
+        user = User(**user_data)
+    except Exception:
+        # đảm bảo trường hợp dữ liệu DB không đầy đủ sẽ bị coi là unauthorized
+        raise credentials_exception
 
-    user = User(**user_data)
     return user
