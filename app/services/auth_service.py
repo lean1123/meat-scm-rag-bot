@@ -7,8 +7,6 @@ from app.services.user_service import get_user_by_email
 import os
 
 SECRET_KEY = os.getenv("SECRET_KEY")
-# log secret key for debugging (in production, avoid logging sensitive info)
-print(f"Using SECRET_KEY: {SECRET_KEY[:4]}...")  # Print only the first 4 characters for security
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 24
 
@@ -46,11 +44,9 @@ async def get_current_user(credentials=Depends(security)):
     )
     try:
         token = credentials.credentials
-        # log token for debugging
-        print(f"Received token: {token}")
+
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # log payload for debugging
-        print(f"Decoded JWT payload: {payload}")
+
         email: str = payload.get("email")
         farm_id: str = payload.get("facilityID")
         if email is None or farm_id is None:
@@ -59,10 +55,8 @@ async def get_current_user(credentials=Depends(security)):
     except JWTError:
         raise credentials_exception
 
-    # Kiểm tra user có tồn tại trong database không
     user_data = get_user_by_email(email=token_data.username, farm_id=farm_id)
-    # log user_data for debugging
-    print(f"User data fetched from DB: {user_data}")
+
     if user_data is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -70,7 +64,6 @@ async def get_current_user(credentials=Depends(security)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Kiểm tra user có đang active không
     if not user_data.get("status") == "active":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

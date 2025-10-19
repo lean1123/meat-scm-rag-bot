@@ -1,7 +1,7 @@
-from app.services.asset_service import get_asset_info_by_id, get_current_feeds, get_current_medications
+from app.services.asset_service import get_current_feeds, get_current_medications
 from app.services.farm_weaviate_service import search_knowledge_base
-from app import auth
-from app.auth import User
+from app.services.auth_service import get_current_user
+from app.services.auth_service import User
 from app.services.gemini_service import detect_intent
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -19,7 +19,7 @@ router = APIRouter()
 
 
 @router.post("/chat", response_model=ChatResponse, tags=["Chat"])
-async def handle_chat(request: ChatRequest, current_user: User = Depends(auth.get_current_user)):
+async def handle_chat(request: ChatRequest, current_user: User = Depends(get_current_user)):
     try:
         user_facility_id = current_user.facilityID
         question = request.question.lower()
