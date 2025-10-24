@@ -6,6 +6,7 @@ from app.services.auth_service import User
 from app.services.auth_service import get_current_user
 from app.services.farm_weaviate_service import search_knowledge_base
 from app.services.gemini_service import detect_intent, generate_answer
+from app.services.get_asset_http_service import get_asset_trace
 from app.services.message_service import MessageService
 from app.repositories.message_repository import MessageRepository
 from app.repositories.conversation_repository import ConversationRepository
