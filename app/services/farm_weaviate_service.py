@@ -1,27 +1,25 @@
 from weaviate.classes.query import Filter
-from app.configurations.weaviate_config import client
+from app.configurations.weaviate_config import get_weaviate_client
 
 
-# check weaviate client connection
-if client is None:
-    print("Weaviate client is not connected. Please check the configuration.")
-
-
+# helper to extract age in days from query
 def extract_age_days(query: str) -> int | None:
     import re
     match = re.search(r"(\d+)\s*ngày", query)
     return int(match.group(1)) if match else None
 
+
 def search_knowledge_base(query: str, farm_id: str) -> dict | None:
-    if not client:
-        print("ERROR: Weaviate client is not available.")
+    client = get_weaviate_client()
+    if client is None:
+        print("Weaviate client is not available. Skipping knowledge base search.")
         return None
 
     try:
         knowledge_collection = client.collections.get("FarmingKnowledge")
         age_days = extract_age_days(query)
 
-        filters  = Filter.by_property("facilityID").equal(farm_id)
+        filters = Filter.by_property("facilityID").equal(farm_id)
 
         if age_days is not None:
             filters = filters & Filter.by_property("min_age_days").less_or_equal(age_days)

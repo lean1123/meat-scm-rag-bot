@@ -24,3 +24,4 @@ services:
 
 volumes:
   weaviate_data:
+

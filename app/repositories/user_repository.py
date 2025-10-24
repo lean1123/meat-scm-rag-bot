@@ -4,7 +4,6 @@ from pymongo.database import Database
 
 
 class UserRepository:
-    """Repository cho collection users. Chỉ cung cấp phương thức đọc (no create/update/delete)."""
 
     def __init__(self, db: Database):
         self._collection = db["users"]

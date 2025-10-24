@@ -1,7 +1,17 @@
-import weaviate
-from weaviate.classes.config import Property, DataType, Configure
+import os
 
-# --- Dữ liệu tri thức mẫu ---
+from dotenv import load_dotenv
+from weaviate.classes.config import Property, DataType
+from weaviate.collections.classes.config import Configure
+
+from app.configurations.weaviate_config import init_weaviate_client, close_weaviate_client
+
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GOOGLE_API_KEY:
+    raise ValueError("GEMINI_API_KEY không được tìm thấy trong file .env")
+
 knowledge_data = [
     {
         "stage": "Tập ăn",
@@ -49,65 +59,70 @@ knowledge_data = [
     }
 ]
 
-# --- Kết nối tới Weaviate ---
-client = weaviate.connect_to_local(
-    host="localhost",
-    port=8081,
-)
-print("Connected to Weaviate.")
 
-# --- Định nghĩa cấu trúc dữ liệu ---
 class_name = "FarmingKnowledge"
 
-# Xóa collection cũ nếu đã tồn tại
-collections = client.collections.list_all()
-if class_name in collections:
-    client.collections.delete(class_name)
-    print(f"Deleted existing collection: {class_name}")
 
-# Tạo collection mới
-client.collections.create(
-    name=class_name,
-    properties=[
-        Property(name="content", data_type=DataType.TEXT),
-        Property(name="stage", data_type=DataType.TEXT),
-        Property(name="species", data_type=DataType.TEXT),
-        Property(name="min_age_days", data_type=DataType.INT),
-        Property(name="max_age_days", data_type=DataType.INT),
-        Property(name="recommended_feed", data_type=DataType.TEXT),
-        Property(name="feed_dosage", data_type=DataType.TEXT),
-        Property(name="medication", data_type=DataType.TEXT),
-        Property(name="notes", data_type=DataType.TEXT),
-        Property(name="facilityID", data_type=DataType.TEXT),
-    ],
-    vectorizer_config=Configure.Vectorizer.text2vec_transformers(),
-)
-print(f"Created new collection: {class_name}")
+def load_knowledge_to_weaviate():
+    # initialize client via config
+    client = init_weaviate_client(google_key=GOOGLE_API_KEY)
+    if client is None:
+        print("Không thể kết nối tới Weaviate. Bỏ qua việc nạp dữ liệu.")
+        return
 
-# --- Nạp dữ liệu vào Weaviate ---
-collection = client.collections.get(class_name)
-print("Loading knowledge data into Weaviate...")
+    try:
+        if client.collections.exists(class_name):
+            print(f"Collection '{class_name}' đã tồn tại. Đang xóa...")
+            client.collections.delete(class_name)
+            print("Đã xóa collection cũ.")
 
-for item in knowledge_data:
-    content = (
-        f"Thông tin chăn nuôi: Giai đoạn {item['stage']} của loài {item['species']} "
-        f"từ {item['min_age_days']} đến {item['max_age_days']} ngày tuổi. "
-        f"Thức ăn phù hợp là {item['recommended_feed']} với liều lượng {item['feed_dosage']}. "
-        f"Thuốc cần dùng: {item['medication']}. "
-        f"Ghi chú: {item['notes']}."
-    )
+        print(f"Đang tạo collection '{class_name}' với Gemini...")
 
-    data_object = item.copy()
-    data_object["content"] = content
-    collection.data.insert(data_object)
+        client.collections.create(
+            name=class_name,
+            properties=[
+                Property(name="content", data_type=DataType.TEXT),
+                Property(name="stage", data_type=DataType.TEXT),
+                Property(name="species", data_type=DataType.TEXT),
+                Property(name="min_age_days", data_type=DataType.INT),
+                Property(name="max_age_days", data_type=DataType.INT),
+                Property(name="recommended_feed", data_type=DataType.TEXT),
+                Property(name="feed_dosage", data_type=DataType.TEXT),
+                Property(name="medication", data_type=DataType.TEXT),
+                Property(name="notes", data_type=DataType.TEXT),
+                Property(name="facilityID", data_type=DataType.TEXT),
+            ],
+            vectorizer_config=Configure.Vectorizer.text2vec_transformers()
+        )
+
+        print(f"Collection '{class_name}' đã được tạo thành công với Gemini.")
+
+        # --- Nạp dữ liệu vào Weaviate ---
+        collection = client.collections.get(class_name)
+        print("Đang tải dữ liệu kiến thức vào Weaviate...")
+
+        for item in knowledge_data:
+            content = (
+                f"Thông tin chăn nuôi: Giai đoạn {item['stage']} của loài {item['species']} "
+                f"từ {item['min_age_days']} đến {item['max_age_days']} ngày tuổi. "
+                f"Thức ăn phù hợp là {item['recommended_feed']} với liều lượng {item['feed_dosage']}. "
+                f"Thuốc cần dùng: {item['medication']}. "
+                f"Ghi chú: {item['notes']}."
+            )
+
+            data_object = item.copy()
+            data_object["content"] = content
+            collection.data.insert(data_object)
+
+        print("Dữ liệu đã được tải thành công!")
+
+    except Exception as e:
+        print(f"Lỗi khi tạo collection hoặc tải dữ liệu: {e}")
 
 
-    data_object = item.copy()
-    data_object["content"] = content
-    collection.data.insert(data_object)
-
-print("Data loaded successfully!")
-
-# Đóng kết nối
-client.close()
-print("Connection closed.")
+if __name__ == "__main__":
+    try:
+        load_knowledge_to_weaviate()
+    finally:
+        close_weaviate_client()
+        print("Đã đóng kết nối.")

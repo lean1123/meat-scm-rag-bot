@@ -4,10 +4,8 @@ from pymongo.database import Database
 
 
 class AssetRepository:
-    """Repository cho collection assets."""
-
     def __init__(self, db: Database):
-        self._collection = db["assets"]
+        self._collection = db["batches"]
 
     def find_by_asset_and_facility(self, asset_id: str, facility_id: str) -> Optional[Dict[str, Any]]:
         try:
