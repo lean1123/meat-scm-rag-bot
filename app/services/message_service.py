@@ -1,5 +1,3 @@
-# /app/services/message.py
-
 from app.repositories.message_repository import MessageRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.models.message import MessageCreate, MessageInDB

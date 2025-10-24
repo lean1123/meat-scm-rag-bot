@@ -5,7 +5,7 @@ from app.services.asset_service import get_asset_service, AssetService
 from app.services.auth_service import User
 from app.services.auth_service import get_current_user
 from app.services.farm_weaviate_service import search_knowledge_base
-from app.services.gemini_service import detect_intent
+from app.services.gemini_service import detect_intent, generate_answer
 from app.services.message_service import MessageService
 from app.repositories.message_repository import MessageRepository
 from app.repositories.conversation_repository import ConversationRepository
@@ -113,8 +113,20 @@ async def handle_chat(request: ChatRequest,
         except Exception as e:
             print(f"Warning while initializing memory service: {e}")
 
+        # Convert memory objects to strings (prefer 'content' field)
+        memory_texts = []
+        for m in conversation_memories:
+            try:
+                if isinstance(m, dict):
+                    content = m.get('content') or m.get('text') or str(m)
+                else:
+                    content = str(m)
+                memory_texts.append(content)
+            except Exception:
+                memory_texts.append(str(m))
+
         print("Calling detect_intent...")
-        intent_data = detect_intent(request.question)
+        intent_data = detect_intent(request.question, memories=memory_texts)
         print(f"Intent data received: {intent_data}")
 
         intent = intent_data.get("intent", "unknown")
@@ -122,50 +134,152 @@ async def handle_chat(request: ChatRequest,
 
         answer = ""
 
+        # if intent == "get_feed_info":
+        #     asset_id = entities.get("batch_id")
+        #     if not asset_id:
+        #         answer = "Bạn muốn hỏi về đàn nào ạ? Vui lòng cung cấp mã đàn (ví dụ: ASSET_HEO_001)."
+        #     else:
+        #         feeds = asset_service.get_current_feeds(asset_id, user_facility_id)
+        #         if feeds:
+        #             current_feed = feeds[0] if feeds else None
+        #             if current_feed:
+        #                 answer = (f"Đàn {asset_id} hiện đang sử dụng '{current_feed.get('name')}' "
+        #                           f"với liều lượng {current_feed.get('dosageKg')} kg/con/ngày "
+        #                           f"từ ngày {current_feed.get('startDate')} đến {current_feed.get('endDate')}. "
+        #                           f"Ghi chú: {current_feed.get('notes', 'Không có ghi chú đặc biệt')}.")
+        #             else:
+        #                 answer = f"Không tìm thấy thông tin thức ăn cho đàn {asset_id}."
+        #         else:
+        #             answer = f"Không tìm thấy thông tin thức ăn cho đàn {asset_id}. Vui lòng kiểm tra lại mã đàn."
+        #
+        # elif intent == "get_medication_info":
+        #     asset_id = entities.get("batch_id")
+        #     if not asset_id:
+        #         answer = "Bạn muốn hỏi về lịch tiêm của đàn nào ạ? Vui lòng cung cấp mã đàn."
+        #     else:
+        #         medications = asset_service.get_current_medications(asset_id, user_facility_id)
+        #         if medications:
+        #             next_medication = None
+        #             for med in medications:
+        #                 if med.get('nextDueDate'):
+        #                     next_medication = med
+        #                     break
+        #
+        #             if next_medication:
+        #                 answer = (f"Theo lịch, đàn {asset_id} cần tiêm nhắc lại "
+        #                           f"'{next_medication.get('name')}' vào ngày {next_medication.get('nextDueDate')} "
+        #                           f"với liều lượng {next_medication.get('dose')}.")
+        #             else:
+        #                 latest_med = medications[-1] if medications else None
+        #                 if latest_med:
+        #                     answer = (f"Đàn {asset_id} đã được tiêm '{latest_med.get('name')}' "
+        #                               f"vào ngày {latest_med.get('dateApplied')} với liều lượng {latest_med.get('dose')}.")
+        #                 else:
+        #                     answer = f"Không tìm thấy thông tin về thuốc/vaccine cho đàn {asset_id}."
+        #         else:
+        #             answer = f"Không tìm thấy thông tin lịch tiêm phòng cho đàn {asset_id}."
+
         if intent == "get_feed_info":
             asset_id = entities.get("batch_id")
             if not asset_id:
                 answer = "Bạn muốn hỏi về đàn nào ạ? Vui lòng cung cấp mã đàn (ví dụ: ASSET_HEO_001)."
             else:
-                feeds = asset_service.get_current_feeds(asset_id, user_facility_id)
-                if feeds:
-                    current_feed = feeds[0] if feeds else None
-                    if current_feed:
-                        answer = (f"Đàn {asset_id} hiện đang sử dụng '{current_feed.get('name')}' "
-                                  f"với liều lượng {current_feed.get('dosageKg')} kg/con/ngày "
-                                  f"từ ngày {current_feed.get('startDate')} đến {current_feed.get('endDate')}. "
-                                  f"Ghi chú: {current_feed.get('notes', 'Không có ghi chú đặc biệt')}.")
-                    else:
-                        answer = f"Không tìm thấy thông tin thức ăn cho đàn {asset_id}."
+                try:
+                    asset = get_asset_trace(asset_id)
+                except Exception as e:
+                    print(f"Error fetching asset trace for {asset_id}: {e}")
+                    answer = f"Không thể lấy thông tin cho đàn {asset_id}: {str(e)}"
                 else:
-                    answer = f"Không tìm thấy thông tin thức ăn cho đàn {asset_id}. Vui lòng kiểm tra lại mã đàn."
+                    # Try to extract feeds from the latest history details
+                    full_history = asset.get("fullHistory", []) or asset.get("history", [])
+                    latest_details = None
+                    if full_history:
+                        latest = full_history[-1]
+                        latest_details = latest.get("details", {}) if isinstance(latest, dict) else {}
+
+                    if not latest_details:
+                        answer = f"Không tìm thấy thông tin nuôi/feeds cho đàn {asset_id}."
+                    else:
+                        feeds = latest_details.get("feeds") or latest_details.get("feed") or []
+                        # feeds can be list of dicts or list of strings
+                        if isinstance(feeds, list) and feeds:
+                            # If items are dicts with name/dosage/startDate/endDate
+                            if all(isinstance(f, dict) for f in feeds):
+                                parts = []
+                                for f in feeds:
+                                    name = f.get("name") or f.get("feedName") or "(không tên)"
+                                    dosage = f.get("dosageKg")
+                                    start = f.get("startDate")
+                                    end = f.get("endDate")
+                                    note = f.get("notes")
+                                    seg = f"{name}"
+                                    if dosage is not None:
+                                        seg += f" — liều {dosage} kg/con/ngày"
+                                    if start or end:
+                                        seg += f" (từ {start or '??'} đến {end or '??'})"
+                                    if note:
+                                        seg += f"; Ghi chú: {note}"
+                                    parts.append(seg)
+                                answer = f"Đàn {asset_id} hiện dùng các loại thức ăn: " + ", ".join(parts)
+                            else:
+                                # list of strings
+                                answer = f"Đàn {asset_id} hiện dùng các loại thức ăn: " + ", ".join(str(x) for x in feeds)
+                        else:
+                            # Fallback to 'feed' simple list or top-level fields
+                            feed_simple = latest_details.get("feed") or asset.get("feed") or asset.get("feeds")
+                            if feed_simple:
+                                answer = f"Đàn {asset_id} hiện dùng các loại thức ăn: " + ", ".join(str(x) for x in feed_simple)
+                            else:
+                                answer = f"Không tìm thấy thông tin thức ăn cho đàn {asset_id}."
 
         elif intent == "get_medication_info":
             asset_id = entities.get("batch_id")
             if not asset_id:
                 answer = "Bạn muốn hỏi về lịch tiêm của đàn nào ạ? Vui lòng cung cấp mã đàn."
             else:
-                medications = asset_service.get_current_medications(asset_id, user_facility_id)
-                if medications:
-                    next_medication = None
-                    for med in medications:
-                        if med.get('nextDueDate'):
-                            next_medication = med
-                            break
-
-                    if next_medication:
-                        answer = (f"Theo lịch, đàn {asset_id} cần tiêm nhắc lại "
-                                  f"'{next_medication.get('name')}' vào ngày {next_medication.get('nextDueDate')} "
-                                  f"với liều lượng {next_medication.get('dose')}.")
-                    else:
-                        latest_med = medications[-1] if medications else None
-                        if latest_med:
-                            answer = (f"Đàn {asset_id} đã được tiêm '{latest_med.get('name')}' "
-                                      f"vào ngày {latest_med.get('dateApplied')} với liều lượng {latest_med.get('dose')}.")
-                        else:
-                            answer = f"Không tìm thấy thông tin về thuốc/vaccine cho đàn {asset_id}."
+                try:
+                    asset = get_asset_trace(asset_id)
+                except Exception as e:
+                    print(f"Error fetching asset trace for {asset_id}: {e}")
+                    answer = f"Không thể lấy thông tin cho đàn {asset_id}: {str(e)}"
                 else:
-                    answer = f"Không tìm thấy thông tin lịch tiêm phòng cho đàn {asset_id}."
+                    full_history = asset.get("fullHistory", []) or asset.get("history", [])
+                    latest_details = None
+                    if full_history:
+                        latest = full_history[-1]
+                        latest_details = latest.get("details", {}) if isinstance(latest, dict) else {}
+
+                    meds = []
+                    if latest_details:
+                        meds_field = latest_details.get("medications") or latest_details.get("medication")
+                        if isinstance(meds_field, list) and meds_field:
+                            # items may be strings or dicts
+                            if all(isinstance(m, dict) for m in meds_field):
+                                for m in meds_field:
+                                    name = m.get("name") or m.get("medicationName") or "(không tên)"
+                                    dose = m.get("dose")
+                                    date_applied = m.get("dateApplied") or m.get("appliedDate")
+                                    next_due = m.get("nextDueDate")
+                                    seg = name
+                                    if dose:
+                                        seg += f" — liều: {dose}"
+                                    if date_applied:
+                                        seg += f"; đã áp dụng: {date_applied}"
+                                    if next_due:
+                                        seg += f"; hạn tiếp theo: {next_due}"
+                                    meds.append(seg)
+                            else:
+                                meds = [str(x) for x in meds_field]
+
+                    if meds:
+                        answer = f"Thông tin thuốc/vắc-xin cho đàn {asset_id}: " + ", ".join(meds)
+                    else:
+                        # fallback: maybe medication info in asset top-level
+                        top_meds = asset.get("medications") or asset.get("medication")
+                        if top_meds:
+                            answer = f"Thông tin thuốc/vắc-xin cho đàn {asset_id}: " + ", ".join(str(x) for x in top_meds)
+                        else:
+                            answer = f"Không tìm thấy thông tin thuốc/vắc-xin cho đàn {asset_id}."
         elif intent == "suggest_feed":
             knowledge = search_knowledge_base(request.question, user_facility_id)
             if knowledge:
@@ -180,13 +294,35 @@ async def handle_chat(request: ChatRequest,
         elif intent == "suggest_medication":
             knowledge = search_knowledge_base(request.question, user_facility_id)
             if knowledge:
-                answer = (f"Đối với vật nuôi giai đoạn '{knowledge['stage']}' ({knowledge['age_range']}), "
+                answer = (f"Với vật nuôi giai đoạn '{knowledge['stage']}' từ ({knowledge['min_age_days']} - {knowledge['max_age_days']}), "
                           f"quy trình khuyến nghị có nhắc đến: '{knowledge['medication']}'. "
                           f"Lưu ý thêm: {knowledge['notes']}. Bạn nên tham khảo ý kiến của bác sĩ thú y để có liều lượng chính xác.")
             else:
                 answer = "Xin lỗi, tôi chưa tìm thấy hướng dẫn về thuốc/vắc-xin phù hợp trong cơ sở tri thức."
         else:
-            answer = "Xin lỗi, tôi chưa được huấn luyện để trả lời câu hỏi này. Bạn có thể hỏi về thông tin đàn, thức ăn hoặc thuốc men nhé."
+            # Unknown intent -> treat as general chat: use Gemini with memories to produce an open response
+            answer = ""
+            used_generate = False
+            try:
+                generated_general = generate_answer(request.question, memories=memory_texts)
+                if generated_general and isinstance(generated_general, str) and generated_general.strip():
+                    answer = generated_general.strip()
+                    used_generate = True
+                else:
+                    answer = "Xin lỗi, tôi chưa được huấn luyện để trả lời câu hỏi này. Bạn có thể hỏi về thông tin đàn, thức ăn hoặc thuốc men nhé."
+            except Exception as e:
+                print(f"Warning: generate_answer for general chat failed: {e}")
+                answer = "Xin lỗi, tôi chưa được huấn luyện để trả lời câu hỏi này. Bạn có thể hỏi về thông tin đàn, thức ăn hoặc thuốc men nhé."
+
+        # --- Enhance the answer using Gemini + memories ---
+        try:
+            # If we already generated an answer for unknown-intent using Gemini, skip extra enhancement.
+            if not ("used_generate" in locals() and used_generate):
+                generated = generate_answer(request.question, memories=memory_texts, assistant_context=answer)
+                if generated and isinstance(generated, str) and generated.strip():
+                    answer = generated.strip()
+        except Exception as e:
+            print(f"Warning: Gemini generate_answer failed: {e}")
 
         # Lưu phản hồi của bot
         bot_message = MessageCreate(

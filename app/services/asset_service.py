@@ -54,4 +54,3 @@ class AssetService:
 def get_asset_service(repo: AssetRepository = Depends(get_asset_repo)) -> AssetService:
     return AssetService(repo)
 
-# Lưu ý: các hàm/ phương thức chỉ đọc dữ liệu (read-only)
