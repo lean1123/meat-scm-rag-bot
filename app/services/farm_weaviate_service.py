@@ -10,6 +10,7 @@ def extract_age_days(query: str) -> int | None:
 
 
 def search_knowledge_base(query: str, farm_id: str) -> dict | None:
+    print(query)
     client = get_weaviate_client()
     if client is None:
         print("Weaviate client is not available. Skipping knowledge base search.")
@@ -33,27 +34,11 @@ def search_knowledge_base(query: str, farm_id: str) -> dict | None:
 
         if result_farm.objects:
             print(f"Found specific knowledge for farm: {farm_id}")
+            print(len(result_farm.objects))
+            print(result_farm.objects[0].properties)
             return result_farm.objects[0].properties
 
     except Exception as e:
         print(f"Error searching farm-specific knowledge: {e}")
-
-    try:
-        knowledge_collection = client.collections.get("FarmingKnowledge")
-
-        global_filter = Filter.by_property("facilityID").equal("global")
-
-        result_global = knowledge_collection.query.near_text(
-            query=query,
-            filters=global_filter,
-            limit=1
-        )
-
-        if result_global.objects:
-            print("Found global knowledge.")
-            return result_global.objects[0].properties
-
-    except Exception as e:
-        print(f"Error searching global knowledge: {e}")
 
     return None

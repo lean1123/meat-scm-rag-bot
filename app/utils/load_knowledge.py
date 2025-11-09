@@ -1,16 +1,8 @@
-import os
-
-from dotenv import load_dotenv
 from weaviate.classes.config import Property, DataType
-from weaviate.collections.classes.config import Configure
+from weaviate.collections.classes.config import Configure, Tokenization, InvertedIndexConfig, BM25Config, \
+    StopwordsConfig
 
 from app.configurations.weaviate_config import init_weaviate_client, close_weaviate_client
-
-load_dotenv()
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GOOGLE_API_KEY:
-    raise ValueError("GEMINI_API_KEY không được tìm thấy trong file .env")
 
 knowledge_data = [
     {
@@ -46,15 +38,15 @@ knowledge_data = [
         "notes": "Tăng cường rau xanh để cải thiện chất lượng thịt.",
         "facilityID": "farm-a"
     },
-    {
+{
         "stage": "Úm gà",
         "species": "Gà",
-        "min_age_days": 1,
-        "max_age_days": 21,
-        "recommended_feed": "De Heus 111S",
-        "feed_dosage": "20-50 g/con/ngày",
-        "medication": "Vắc-xin Newcastle (lần 1), Gumboro",
-        "notes": "Luôn giữ nhiệt độ chuồng úm ở 30-32°C, che chắn gió lùa.",
+        "min_age_days": 21,
+        "max_age_days": 41,
+        "recommended_feed": "Cargill 803S",
+        "feed_dosage": "3.5 kg/con/ngày",
+        "medication": "Tiêm nhắc lại vắc-xin dịch tả",
+        "notes": "Tăng cường rau xanh để cải thiện chất lượng thịt.",
         "facilityID": "farm-b"
     }
 ]
@@ -65,7 +57,7 @@ class_name = "FarmingKnowledge"
 
 def load_knowledge_to_weaviate():
     # initialize client via config
-    client = init_weaviate_client(google_key=GOOGLE_API_KEY)
+    client = init_weaviate_client()
     if client is None:
         print("Không thể kết nối tới Weaviate. Bỏ qua việc nạp dữ liệu.")
         return
@@ -78,19 +70,107 @@ def load_knowledge_to_weaviate():
 
         print(f"Đang tạo collection '{class_name}' với Gemini...")
 
+        # client.collections.create(
+        #     name=class_name,
+        #     properties=[
+        #         Property(name="content", data_type=DataType.TEXT),
+        #         Property(name="stage", data_type=DataType.TEXT),
+        #         Property(name="species", data_type=DataType.TEXT),
+        #         Property(name="min_age_days", data_type=DataType.INT),
+        #         Property(name="max_age_days", data_type=DataType.INT),
+        #         Property(name="recommended_feed", data_type=DataType.TEXT),
+        #         Property(name="feed_dosage", data_type=DataType.TEXT),
+        #         Property(name="medication", data_type=DataType.TEXT),
+        #         Property(name="notes", data_type=DataType.TEXT),
+        #         Property(name="facilityID", data_type=DataType.TEXT)
+        #     ],
+        #     vectorizer_config=Configure.Vectorizer.text2vec_transformers()
+        # )
+
+        stopwords_cfg = StopwordsConfig(
+            preset="en",
+            additions=[],
+            removals=[]
+        )
+
+        inverted_cfg = InvertedIndexConfig(
+            bm25=BM25Config(k1=1.2, b=0.75),
+            cleanup_interval_seconds=60,
+            index_null_state=True,
+            index_property_length=True,
+            index_timestamps=True,
+            stopwords=stopwords_cfg,
+        )
+
         client.collections.create(
             name=class_name,
             properties=[
-                Property(name="content", data_type=DataType.TEXT),
-                Property(name="stage", data_type=DataType.TEXT),
-                Property(name="species", data_type=DataType.TEXT),
-                Property(name="min_age_days", data_type=DataType.INT),
-                Property(name="max_age_days", data_type=DataType.INT),
-                Property(name="recommended_feed", data_type=DataType.TEXT),
-                Property(name="feed_dosage", data_type=DataType.TEXT),
-                Property(name="medication", data_type=DataType.TEXT),
-                Property(name="notes", data_type=DataType.TEXT),
-                Property(name="facilityID", data_type=DataType.TEXT),
+                Property(
+                    name="content",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.WORD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
+                Property(
+                    name="stage",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.WORD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
+                Property(
+                    name="species",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.WORD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
+                Property(name="min_age_days", data_type=DataType.INT, index_filterable=True),
+                Property(name="max_age_days", data_type=DataType.INT, index_filterable=True),
+                Property(
+                    name="recommended_feed",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.WORD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
+                Property(
+                    name="feed_dosage",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.WORD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
+                Property(
+                    name="medication",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.WORD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
+                Property(
+                    name="notes",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.WORD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
+                Property(
+                    name="facilityID",
+                    data_type=DataType.TEXT,
+                    tokenization=Tokenization.FIELD,
+                    index_filterable=True,
+                    index_searchable=True,
+                    inverted_index_config=inverted_cfg,
+                ),
             ],
             vectorizer_config=Configure.Vectorizer.text2vec_transformers()
         )

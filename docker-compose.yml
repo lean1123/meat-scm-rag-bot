@@ -22,6 +22,22 @@ services:
     environment:
       ENABLE_CUDA: '0'  # Đặt là 1 nếu bạn có GPU
 
+#  app:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    image: meat-scm-chat-bot-server:latest
+#    env_file:
+#      - .env
+#    ports:
+#      - "8000:8000"
+#    depends_on:
+#      - weaviate
+#      - t2v-transformers
+#    restart: unless-stopped
+#    volumes:
+#      - ./:/app
+#    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+
 volumes:
   weaviate_data:
-

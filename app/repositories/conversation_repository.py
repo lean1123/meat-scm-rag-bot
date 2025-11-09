@@ -42,3 +42,32 @@ class ConversationRepository:
             {"_id": convo_id},
             {"$set": {"updated_at": timestamp}}
         )
+
+    def list_by_user(self, email: str, facilityID: str | None = None, limit: int = 50, offset: int = 0) -> list[ConversationInDB]:
+        """Trả về danh sách Conversation cho một email (và optional facilityID) có phân trang.
+
+        - Sắp xếp theo `updated_at` giảm dần (mới nhất trước).
+        - Chuyển _id sang string trước khi tạo ConversationInDB để tránh lỗi Pydantic với ObjectId.
+        """
+        query = {"email": email}
+        if facilityID:
+            query["facilityID"] = facilityID
+
+        cursor = self.collection.find(query).sort("updated_at", -1).skip(offset).limit(limit)
+        results: list[ConversationInDB] = []
+        for doc in cursor:
+            d = dict(doc)
+            if "_id" in d:
+                d["_id"] = str(d["_id"])
+            results.append(ConversationInDB(**d))
+        return results
+
+    def update_title(self, convo_id: ObjectId, new_title: str):
+        self.collection.update_one(
+            {"_id": convo_id},
+            {"$set": {"title": new_title, "updated_at": datetime.now(timezone.utc)}}
+        )
+
+    def delete_by_id(self, convo_id: ObjectId):
+        self.collection.delete_one({"_id": convo_id})
+

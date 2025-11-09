@@ -7,15 +7,9 @@ from weaviate.collections.classes.config import Configure
 
 from app.configurations.weaviate_config import (
     init_weaviate_client,
-    get_weaviate_client,
     close_weaviate_client,
 )
 
-load_dotenv()
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GOOGLE_API_KEY:
-    raise ValueError("GOOGLE_API_KEY không được tìm thấy trong file .env")
 
 memory_properties = [
     Property(
@@ -65,7 +59,7 @@ collection_name = "ChatMemory"
 
 
 def init_chat_memory_collection():
-    client = init_weaviate_client(google_key=GOOGLE_API_KEY)
+    client = init_weaviate_client()
     if client is None:
         print("Không thể kết nối tới Weaviate. Bỏ qua việc tạo collection.")
         return
