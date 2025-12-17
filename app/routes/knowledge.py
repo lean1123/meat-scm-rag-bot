@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
-from sympy import false
+
 
 from app.services.auth_service import get_current_user, User
 from app.configurations.weaviate_config import get_weaviate_client
