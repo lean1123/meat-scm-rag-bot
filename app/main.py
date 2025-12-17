@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes import chat
 from app.routes import conversation
 from app.routes import message_route
+from app.routes import knowledge
 
 from app.configurations.weaviate_config import init_weaviate_client, close_weaviate_client
 
@@ -48,6 +49,7 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api")
 app.include_router(conversation.router, prefix="/api", tags=["Conversations"])
 app.include_router(message_route.router, prefix="/api", tags=["Messages"])
+app.include_router(knowledge.router, prefix="/api")
 
 
 @app.get("/", tags=["Root"])
